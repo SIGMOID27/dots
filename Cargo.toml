@@ -3,6 +3,9 @@ name = "dots"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies]
-rand = "0.8.4"
-sdl2 = "0.35.1"
+[dependencies.rand]
+version = "0.8.4"
+
+[dependencies.sdl2]
+version = "0.35.1"
+features = ["bundled", "static-link"]
