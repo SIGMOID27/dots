@@ -3,15 +3,13 @@ use sdl2::event::Event;
 use sdl2::rect::Point;
 use std::time::Duration;
 use std::time::Instant;
-use std::ops::Range;
 use std::thread;
 use core::array;
-use rand::Rng;
 
 const WIDTH: u32 = 800;
 const HEIGHT: u32 = 800;
-const FORCES: Range<f32> = -1.0..1.0;
-const RADII: Range<f32> = 20.0..80.0;
+const MAX_FORCE: f32 = 1.0;
+const MAX_RADIUS: f32 = 100.0;
 const VISCOSITY: f32 = 0.7;
 const POPULATION: usize = 1000;
 const VARIANTS: usize = 4;
@@ -21,13 +19,6 @@ const COLORS: [Color; VARIANTS] = [
     Color::GREEN,
     Color::MAGENTA
 ];
-
-struct Variant {
-    color: Color,
-    radius: f32,
-    forces: [f32; VARIANTS],
-    dots: Vec<Dot>
-}
 
 struct Dot {
     x: f32,
@@ -42,59 +33,48 @@ fn main() {
     let window = video.window("dots", WIDTH, HEIGHT).build().unwrap();
     let mut canvas = window.into_canvas().build().unwrap();
     let mut events = ctx.event_pump().unwrap();
-    let mut rng = rand::thread_rng();
-    let mut variants: [Variant; VARIANTS] = COLORS.map(|color| Variant {
-        color,
-        radius: rng.gen_range(RADII),
-        forces: array::from_fn(|_| rng.gen_range(FORCES)),
-        dots: (0..POPULATION).map(|_| Dot {
-            x: rng.gen_range(0.0..WIDTH as f32),
-            y: rng.gen_range(0.0..HEIGHT as f32),
-            vx: 0.0,
-            vy: 0.0
-        }).collect(),
-    });
+    let mut points = [Point::new(0, 0); POPULATION];
+    let mut rng = fastrand::Rng::new();
+    let radii: [f32; VARIANTS] = array::from_fn(|_| rng.f32() * MAX_RADIUS);
+    let forces: [f32; VARIANTS * VARIANTS] = array::from_fn(|_| (rng.f32() - 0.5) * MAX_FORCE / 0.5);
+    let mut dots: *mut Dot = array::from_fn(|_| Dot {
+        x: rng.f32() * WIDTH as f32, y: rng.f32() * HEIGHT as f32, vx: 0.0, vy: 0.0
+    }).as_mut_ptr(); //::<_, {VARIANTS * POPULATION}, _>
     'legs: loop {
         let start = Instant::now();
         for event in events.poll_iter() {
-            if let Event::Quit {..} = event { break 'legs }
+            if let Event::Quit { .. } = event { break 'legs }
         }
         canvas.set_draw_color(Color::BLACK);
         canvas.clear();
-        for i in 0..VARIANTS {
-            let world_split = world.split_at_mut(i + 1);
-            let dots = &mut world_split.0[i];
-            let force = dots.forces[i];
-            let mut points = [Point::new(0, 0); POPULATION];
-            for j in 0..POPULATION {
-                let dots_split = dots.dots.split_at_mut(j + 1);
-                let dot = &mut dots_split.0[j];
-                for other in dots_split.1 {
+        for variant in 0..VARIANTS {
+            let radius = radii[variant];
+            for offset1 in 0..POPULATION {
+                for offset2 in a + 1..POPULATION {
                     let dx = dot.x - other.x;
                     let dy = dot.y - other.y;
                     let d = dx * dx + dy * dy;
-                    if d < dots.radius {
+                    if d < radius {
                         dot.vx += dx / d;
                         dot.vy += dy / d;
+                        other.vx -= dx / d;
+                        other.vy -= dy / d;
                     }
                 }
-                for other_dots in world_split.1.iter_mut() {
-                    let other_force = other_dots.forces[i];
-                    for other in &mut other_dots.dots {
-                    }
-                }
+
                 dot.vx *= VISCOSITY;
                 dot.x += dot.vx;
-                if dot.x < 0.0 || dot.x >= WIDTH { dot.x -= dot.vx * 2.0 }
+                if dot.x < 0.0 || dot.x >= WIDTH as f32 { dot.x -= dot.vx * 2.0 }
                 dot.vy *= VISCOSITY;
                 dot.y += dot.vy;
-                if dot.y < 0.0 || dot.y >= WIDTH { dot.y -= dot.vy * 2.0 }
-                points[j] = Point::new(dot.x as i32, dot.y as i32);
+                if dot.y < 0.0 || dot.y >= WIDTH as f32 { dot.y -= dot.vy * 2.0 }
+                points[a] = Point::new(dot.x as i32, dot.y as i32);
             }
-            canvas.set_draw_color(COLORS[i]);
+            canvas.set_draw_color(COLORS[variant]);
             canvas.draw_points(points.as_slice()).unwrap();
-        canvas.present();
-        let end = Instant::now() - start;
-        thread::sleep(end.max(Duration::from_nanos(1_000_000_000 / 60)));
+            canvas.present();
+            let end = Instant::now() - start;
+            thread::sleep(end.max(Duration::from_nanos(1_000_000_000 / 60)));
+        }
     }
 }
