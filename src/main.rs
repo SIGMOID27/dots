@@ -5,13 +5,14 @@ use std::time::Duration;
 use std::time::Instant;
 use std::thread;
 use core::array;
+use std::ops::Range;
 
 const WIDTH: u32 = 800;
 const HEIGHT: u32 = 800;
 const MAX_FORCE: f32 = 1.0;
 const MAX_RADIUS: f32 = 100.0;
 const VISCOSITY: f32 = 0.7;
-const POPULATION: usize = 1000;
+const POPULATION: usize = 1024;
 const VARIANTS: usize = 4;
 const COLORS: [Color; VARIANTS] = [
     Color::RED,
@@ -37,7 +38,7 @@ fn main() {
     let mut rng = fastrand::Rng::new();
     let radii: [f32; VARIANTS] = array::from_fn(|_| rng.f32() * MAX_RADIUS);
     let forces: [f32; VARIANTS * VARIANTS] = array::from_fn(|_| (rng.f32() - 0.5) * MAX_FORCE / 0.5);
-    let mut dots: *mut Dot = array::from_fn(|_| Dot {
+    let mut dot: *mut Dot = array::from_fn(|_| Dot {
         x: rng.f32() * WIDTH as f32, y: rng.f32() * HEIGHT as f32, vx: 0.0, vy: 0.0
     }).as_mut_ptr(); //::<_, {VARIANTS * POPULATION}, _>
     'legs: loop {
@@ -47,10 +48,17 @@ fn main() {
         }
         canvas.set_draw_color(Color::BLACK);
         canvas.clear();
+
         for variant in 0..VARIANTS {
             let radius = radii[variant];
             for offset1 in 0..POPULATION {
-                for offset2 in a + 1..POPULATION {
+                let dot = unsafe {
+                    pointer = pointer.add(1);
+                    pointer.read()
+                };
+
+                for offset2 in offset1 + 1..POPULATION {
+                    let other = unsafe { dots.add(offset2).read() };
                     let dx = dot.x - other.x;
                     let dy = dot.y - other.y;
                     let d = dx * dx + dy * dy;
@@ -70,11 +78,11 @@ fn main() {
                 if dot.y < 0.0 || dot.y >= WIDTH as f32 { dot.y -= dot.vy * 2.0 }
                 points[a] = Point::new(dot.x as i32, dot.y as i32);
             }
-            canvas.set_draw_color(COLORS[variant]);
-            canvas.draw_points(points.as_slice()).unwrap();
-            canvas.present();
-            let end = Instant::now() - start;
-            thread::sleep(end.max(Duration::from_nanos(1_000_000_000 / 60)));
         }
+        canvas.set_draw_color(COLORS[variant]);
+        canvas.draw_points(points.as_slice()).unwrap();
+        canvas.present();
+        let end = Instant::now() - start;
+        thread::sleep(end.max(Duration::from_nanos(1_000_000_000 / 60)));
     }
 }
