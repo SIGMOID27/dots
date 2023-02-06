@@ -5,7 +5,6 @@ use std::time::Duration;
 use std::time::Instant;
 use std::thread;
 use core::array;
-use std::ops::Range;
 
 const WIDTH: u32 = 800;
 const HEIGHT: u32 = 800;
@@ -22,10 +21,8 @@ const COLORS: [Color; VARIANTS] = [
 ];
 
 struct Dot {
-    x: f32,
-    y: f32,
-    vx: f32,
-    vy: f32,
+    kind: u8,
+
 }
 
 fn main() {
@@ -34,7 +31,6 @@ fn main() {
     let window = video.window("dots", WIDTH, HEIGHT).build().unwrap();
     let mut canvas = window.into_canvas().build().unwrap();
     let mut events = ctx.event_pump().unwrap();
-    let mut points = [Point::new(0, 0); POPULATION];
     let mut rng = fastrand::Rng::new();
     let radii: [f32; VARIANTS] = array::from_fn(|_| rng.f32() * MAX_RADIUS);
     let forces: [f32; VARIANTS * VARIANTS] = array::from_fn(|_| (rng.f32() - 0.5) * MAX_FORCE / 0.5);
@@ -49,12 +45,13 @@ fn main() {
         canvas.set_draw_color(Color::BLACK);
         canvas.clear();
 
+        let mut ptr = dot.add();
         for variant in 0..VARIANTS {
             let radius = radii[variant];
             for offset1 in 0..POPULATION {
                 let dot = unsafe {
-                    pointer = pointer.add(1);
-                    pointer.read()
+                    dot = dot.add(1);
+                    dot.read()
                 };
 
                 for offset2 in offset1 + 1..POPULATION {
