@@ -6,4 +6,3 @@ edition = "2021"
 [dependencies]
 fastrand = "1.8.0"
 sdl2 = { version = "0.35.2", features = ["bundled", "static-link"] }
-half = "2.2.1"
